@@ -1982,8 +1982,14 @@ func parseSubSelectors(path string) (sels []subSelector, out string, ok bool) {
 		case '\\':
 			i++
 		case '@':
+			// A modifier can appear at the start of a sub-path (right after
+			// the opening '[', '{' or a ',' separator), or following a '.'
+			// or '|' separator in the middle of a sub-path. Recognizing the
+			// start-of-sub-path position keeps the ':' that separates the
+			// modifier from its argument from being mistaken for the
+			// subselector name/path colon.
 			if modifier == 0 && i > 0 && (path[i-1] == '.' ||
-				path[i-1] == '|') {
+				path[i-1] == '|' || i == start) {
 				modifier = i
 			}
 		case ':':

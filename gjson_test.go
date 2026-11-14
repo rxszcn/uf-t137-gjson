@@ -1787,6 +1787,64 @@ func TestSubSelectors(t *testing.T) {
 		`[["Dale",10],["Roger",40]]`)
 }
 
+func TestSubSelectorModifiers(t *testing.T) {
+	json := `{"name":{"first":"tom","last":"anderson"},"age":37,` +
+		`"children":["sara","alex","jack"],` +
+		`"nets":[{"net":"ig","followers":10},{"net":"fb","followers":20}]}`
+	pretty := "{ \"first\": \"tom\", \"last\": \"anderson\" }\n"
+	cases := []struct {
+		path string
+		want string
+	}{
+		// array subselectors, no modifiers (baseline)
+		{`[name.first,age]`, `["tom",37]`},
+		// array subselectors, argument-less modifiers
+		{`[name.first.@reverse,age]`, `["tom",37]`},
+		{`[name.@reverse,age]`, `[{"last":"anderson","first":"tom"},37]`},
+		{`[age,name.@reverse]`, `[37,{"last":"anderson","first":"tom"}]`},
+		// array subselectors, modifiers with object-literal arguments
+		{`[name.@pretty:{"indent":"  "},age]`, `[` + pretty + `,37]`},
+		{`[age,name.@pretty:{"indent":"  "}]`, `[37,` + pretty + `]`},
+		{`[name.@pretty:{"indent":"  "}.@ugly,age]`,
+			`[{"first":"tom","last":"anderson"},37]`},
+		{`[nets.@flatten:{"deep":true},age]`,
+			`[[{"net":"ig","followers":10},{"net":"fb","followers":20}],37]`},
+		{`[nets.@join:{"preserve":true},age]`,
+			`[{"net":"ig","followers":10,"net":"fb","followers":20},37]`},
+		// array subselectors, modifiers with simple arguments
+		{`[name.@dig:first,age]`, `[["tom"],37]`},
+		{`[age,name.@dig:last]`, `[37,["anderson"]]`},
+		// array subselectors, piped modifiers
+		{`[name.first|@reverse,age]`, `["tom",37]`},
+		{`[name|@pretty:{"indent":"  "},age]`, `[` + pretty + `,37]`},
+		// object subselectors, named keys
+		{`{"n":name,"a":age}`, `{"n":{"first":"tom","last":"anderson"},"a":37}`},
+		{`{"n":name.@reverse,"a":age}`,
+			`{"n":{"last":"anderson","first":"tom"},"a":37}`},
+		{`{"n":name.@pretty:{"indent":"  "},"a":age}`,
+			`{"n":` + pretty + `,"a":37}`},
+		{`{"n":name.@dig:first,"a":age}`, `{"n":["tom"],"a":37}`},
+		// object subselectors, quoted keys
+		{`{"first name":name.first,"a":age}`, `{"first name":"tom","a":37}`},
+		{`{"f\"x":name.first,"a":age}`, `{"f\"x":"tom","a":37}`},
+		// object subselectors, unnamed keys
+		{`{name.@reverse,age}`,
+			`{"@reverse":{"last":"anderson","first":"tom"},"age":37}`},
+		{`{name.@pretty:{"indent":"  "},age}`, `{"_":` + pretty + `,"age":37}`},
+		{`{@reverse}`, `{"@reverse":{` +
+			`"nets":[{"net":"ig","followers":10},{"net":"fb","followers":20}],` +
+			`"children":["sara","alex","jack"],"age":37,` +
+			`"name":{"first":"tom","last":"anderson"}}}`},
+		// modifiers applied to the subselector result itself
+		{`[name.first,age].@reverse`, `[37,"tom"]`},
+		{`{"n":name,"a":age}.@keys`, `["n","a"]`},
+	}
+	for _, c := range cases {
+		got := Get(json, c.path).Raw
+		assert(t, got == c.want)
+	}
+}
+
 func TestArrayCountRawOutput(t *testing.T) {
 	assert(t, Get(`[1,2,3,4]`, "#").Raw == "4")
 }
